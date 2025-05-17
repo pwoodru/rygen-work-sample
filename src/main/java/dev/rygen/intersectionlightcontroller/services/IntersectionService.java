@@ -31,42 +31,42 @@ public class IntersectionService {
 
         List<TrafficLight> initLights = List.of(
         TrafficLight.builder()
-            .currColor(Colors.GREEN)
-            .gTime(6)
+            .currColor(Colors.OFF)
+            .gTime(4)
             .yTime(3)
-            .rTime(6)
+            .rTime(4)
             .isActive(false)
-            .road("Main St")
+            .road("N Main St")
             .direction("North")
             .intersection(int1)
             .build(),
         TrafficLight.builder()
-            .currColor(Colors.GREEN)
-            .gTime(6)
+            .currColor(Colors.OFF)
+            .gTime(4)
             .yTime(3)
-            .rTime(6)
+            .rTime(4)
             .isActive(false)
-            .road("Main St")
+            .road("N Main St")
             .direction("South")
             .intersection(int1)
             .build(),
         TrafficLight.builder()
-            .currColor(Colors.GREEN)
-            .gTime(6)
+            .currColor(Colors.OFF)
+            .gTime(4)
             .yTime(3)
-            .rTime(6)
+            .rTime(4)
             .isActive(false)
-            .road("Broadway")
+            .road("College St")
             .direction("East")
             .intersection(int1)
             .build(),
         TrafficLight.builder()
-            .currColor(Colors.GREEN)
-            .gTime(6)
+            .currColor(Colors.OFF)
+            .gTime(4)
             .yTime(3)
-            .rTime(6)
+            .rTime(4)
             .isActive(false)
-            .road("Broadway")
+            .road("College St")
             .direction("West")
             .intersection(int1)
             .build()
@@ -107,11 +107,11 @@ public class IntersectionService {
                 delay = light.getRTime();
             }
 
-            scheduler.schedule(this, delay, TimeUnit.MILLISECONDS);
+            scheduler.schedule(this, delay, TimeUnit.SECONDS);
             }
         };
 
-        scheduler.schedule(cycleTask, 0, TimeUnit.MILLISECONDS); // Start immediately
+        scheduler.schedule(cycleTask, 0, TimeUnit.SECONDS); // Start immediately
     }
 
 }
