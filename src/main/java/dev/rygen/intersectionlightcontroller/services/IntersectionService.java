@@ -84,6 +84,11 @@ public class IntersectionService {
     public void activateLights(int intersectionId) {
         List<TrafficLight> lights = lightRepository.findByIntersection_IntersectionId(intersectionId);
 
+        // Spam prevention: if any light is already active, do not start the cycle
+        if (lights.stream().anyMatch(TrafficLight::isActive)) {
+            return;
+        }
+
         for (TrafficLight light : lights) {
             if (!light.isActive()) {
                 light.setCurrColor(Colors.OFF);
@@ -97,6 +102,11 @@ public class IntersectionService {
 
     public void deactivateLights(int intersectionId) {
         List<TrafficLight> lights = lightRepository.findByIntersection_IntersectionId(intersectionId);
+
+        // Spam prevention: if no light is active, do not stop the cycle
+        if (lights.stream().noneMatch(TrafficLight::isActive)) {
+            return;
+        }
 
         for (TrafficLight light : lights) {
             // Cancel all scheduled tasks to reset colors and timers
@@ -113,7 +123,7 @@ public class IntersectionService {
 
     private void startLightCycle(int intersectionId, List<TrafficLight> lights) {
     Runnable cycleTask = new Runnable() {
-        private boolean nsActive = true;
+        private boolean northSouthActive = true;
 
         @Override
         public void run() {
@@ -133,7 +143,7 @@ public class IntersectionService {
                 }
             }
 
-            if (nsActive) {
+            if (northSouthActive) {
                 updateLights(northSouth, Colors.GREEN);
                 updateLights(eastWest, Colors.RED);
                 lightRepository.saveAll(lights);
@@ -171,7 +181,7 @@ public class IntersectionService {
                 }
             }
 
-            nsActive = !nsActive;
+            northSouthActive = !northSouthActive;
         }
     };
 

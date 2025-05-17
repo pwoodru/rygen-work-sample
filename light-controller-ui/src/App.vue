@@ -2,6 +2,7 @@
 import { ref, onMounted } from 'vue'
 import axios from 'axios'
 
+const isLoading = ref(false)
 const activeIntersection = ref<number | null>(null)
 const trafficLights = ref<any[]>([])
 const isActive = ref<boolean>(false)
@@ -23,30 +24,41 @@ const createIntersection = async () => {
 }
 
 const activateLights = async () => {
-  if (activeIntersection.value === null) return
+  if (activeIntersection.value === null || isLoading.value || isActive.value) 
+  return isLoading.value = true
 
   try {
     await axios.post(`http://localhost:8080/intersections/${activeIntersection.value}/activate`)
     isActive.value = true
     startPolling()
-    console.log('Sending activation request...')
+    console.log('Activating lights...')
   } catch (err) {
     console.error(err)
+  } finally {
+    isLoading.value = false
   }
 }
 
 const deactivateLights = async () => {
+  if (activeIntersection.value === null || isLoading.value || !isActive.value) 
+  return isLoading.value = true
+
   isActive.value = false
   clearInterval(pollInterval)
 
-  if (activeIntersection.value !== null) {
+  try {
     await axios.post(`http://localhost:8080/intersections/${activeIntersection.value}/deactivate`)
+    isActive.value = false
+    clearInterval(pollInterval)
+    trafficLights.value = trafficLights.value.map(light => ({
+      ...light, color: 'OFF'
+    }))
+    console.log('Lights deactivated')
+  } catch (err) {
+    console.error(err)
+  } finally {
+    isLoading.value = false
   }
-  
-  trafficLights.value = trafficLights.value.map(light => ({
-    ...light, color: 'OFF'
-  }))
-  console.log('Lights deactivated')
 }
 
 const fetchLights = async () => {
@@ -94,8 +106,8 @@ onMounted(() => {
   <main>
     <div class="light-controller">
       <div class="controls">
-        <button @click="activateLights">Activate Lights</button>
-        <button @click="deactivateLights">Deactivate Lights</button>
+        <button @click="activateLights" :disabled="isLoading || isActive">Activate Lights</button>
+        <button @click="deactivateLights" :disabled="isLoading || !isActive">Deactivate Lights</button>
       </div>
       <p>Status: {{ isActive ? 'Active' : 'Inactive' }}</p>
 
@@ -122,7 +134,9 @@ onMounted(() => {
           </div>
         </div>
 
-        <div class="center-label">Intersection</div>
+        <div class="center-label">
+          <img src="./assets/intersection.png" alt="Intersection" />
+        </div>
 
         <div class="light east" v-if="getLight('East')">
           <div class="light-box">
@@ -153,6 +167,7 @@ onMounted(() => {
 <style scoped>
 header {
   line-height: 1.5;
+  text-align: center;
 }
 
 .light-controller {
@@ -198,9 +213,18 @@ header {
   grid-area: west;
 }
 
+.center-label img {
+  max-width: 130px;
+  max-height: 130px;
+  object-fit: contain;
+}
+
 .center-label {
   grid-area: center;
-  font-weight: bold;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 0.5rem;
 }
 
 .light-box {
@@ -211,8 +235,15 @@ header {
   display: flex;
   flex-direction: column;
   gap: 0.4rem;
+  padding: 0.6rem 0.4rem;
+  width: 60px;
   align-items: center;
   margin-top: 0.5rem;
+  border: #e7b416 2px solid;
+  border-radius: 8px;
+  background-color: #222;
+  box-shadow: 0 0 10px #e7b416;
+  margin: 0 auto;
 }
 
 .bulb {
