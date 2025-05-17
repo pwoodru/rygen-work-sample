@@ -6,6 +6,7 @@ import dev.rygen.intersectionlightcontroller.entities.TrafficLight;
 import dev.rygen.intersectionlightcontroller.repositories.IntersectionRepository;
 import dev.rygen.intersectionlightcontroller.repositories.LightRepository;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -87,10 +88,11 @@ public class IntersectionService {
             if (!light.isActive()) {
                 light.setCurrColor(Colors.OFF);
                 light.setIsActive(true);
-                lightRepository.save(light);
-                startLightCycle(light);
+                
             }
         }
+        lightRepository.saveAll(lights);
+        startLightCycle(intersectionId, lights);
     }
 
     public void deactivateLights(int intersectionId) {
@@ -109,32 +111,80 @@ public class IntersectionService {
         lightRepository.saveAll(lights);
     }
 
-    private void startLightCycle(TrafficLight light) {
-        Runnable cycleTask = new Runnable() {
-        private Colors current = light.getCurrColor();
+    private void startLightCycle(int intersectionId, List<TrafficLight> lights) {
+    Runnable cycleTask = new Runnable() {
+        private boolean nsActive = true;
 
         @Override
         public void run() {
-            current = current.next();
-            light.setCurrColor(current);
-            lightRepository.save(light);
+            List<TrafficLight> northSouth = new ArrayList<>();
+            List<TrafficLight> eastWest = new ArrayList<>();
 
-            long delay;
-            if (current == Colors.GREEN) {
-                delay = light.getGTime();
-            } else if (current == Colors.YELLOW) {
-                delay = light.getYTime();
+            for (TrafficLight light : lights) {
+                switch (light.getDirection().toLowerCase()) {
+                    case "north":
+                    case "south":
+                        northSouth.add(light);
+                        break;
+                    case "east":
+                    case "west":
+                        eastWest.add(light);
+                        break;
+                }
+            }
+
+            if (nsActive) {
+                updateLights(northSouth, Colors.GREEN);
+                updateLights(eastWest, Colors.RED);
+                lightRepository.saveAll(lights);
+
+                ScheduledFuture<?> yellowTask = scheduler.schedule(() -> {
+                    updateLights(northSouth, Colors.YELLOW);
+                    lightRepository.saveAll(lights);
+                }, northSouth.get(0).getGTime(), TimeUnit.SECONDS);
+
+                ScheduledFuture<?> nextCycle = scheduler.schedule(this,
+                    northSouth.get(0).getGTime() + northSouth.get(0).getYTime(),
+                    TimeUnit.SECONDS);
+
+                for (TrafficLight light : northSouth) {
+                    scheduledTasks.put(light.getId(), yellowTask);
+                    scheduledTasks.put(light.getId(), nextCycle);
+                }
             } else {
-                delay = light.getRTime();
+                updateLights(eastWest, Colors.GREEN);
+                updateLights(northSouth, Colors.RED);
+                lightRepository.saveAll(lights);
+
+                ScheduledFuture<?> yellowTask = scheduler.schedule(() -> {
+                    updateLights(eastWest, Colors.YELLOW);
+                    lightRepository.saveAll(lights);
+                }, eastWest.get(0).getGTime(), TimeUnit.SECONDS);
+
+                ScheduledFuture<?> nextCycle = scheduler.schedule(this,
+                    eastWest.get(0).getGTime() + eastWest.get(0).getYTime(),
+                    TimeUnit.SECONDS);
+
+                for (TrafficLight light : eastWest) {
+                    scheduledTasks.put(light.getId(), yellowTask);
+                    scheduledTasks.put(light.getId(), nextCycle);
+                }
             }
 
-            ScheduledFuture<?> nextTask = scheduler.schedule(this, delay, TimeUnit.SECONDS);
-            scheduledTasks.put(light.getId(), nextTask);
-            }
-        };
+            nsActive = !nsActive;
+        }
+    };
 
         ScheduledFuture<?> initialTask = scheduler.schedule(cycleTask, 0, TimeUnit.SECONDS);
-        scheduledTasks.put(light.getId(), initialTask);
+        for (TrafficLight light : lights) {
+            scheduledTasks.put(light.getId(), initialTask);
+        }
+    }
+
+    private void updateLights(List<TrafficLight> lights, Colors color) {
+        for (TrafficLight light : lights) {
+            light.setCurrColor(color);
+        }
     }
 
 }
