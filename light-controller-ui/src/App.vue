@@ -35,9 +35,14 @@ const activateLights = async () => {
   }
 }
 
-const deactivateLights = () => {
+const deactivateLights = async () => {
   isActive.value = false
   clearInterval(pollInterval)
+
+  if (activeIntersection.value !== null) {
+    await axios.post(`http://localhost:8080/intersections/${activeIntersection.value}/deactivate`)
+  }
+  
   trafficLights.value = trafficLights.value.map(light => ({
     ...light, color: 'OFF'
   }))
@@ -70,6 +75,10 @@ const startPolling = () => {
   pollInterval = setInterval(fetchLights, 1000)
 }
 
+const getLight = (direction: string) => {
+  return trafficLights.value.find(light => light.direction.toLowerCase() === direction.toLowerCase())
+}
+
 onMounted(() => {
   createIntersection()
 })
@@ -83,23 +92,62 @@ onMounted(() => {
   </header>
 
   <main>
-  <div class="light-controller">
-    <div class="controls">
-      <button @click="activateLights">Activate Lights</button>
-      <button @click="deactivateLights">Deactivate Lights</button>
-    </div>
+    <div class="light-controller">
+      <div class="controls">
+        <button @click="activateLights">Activate Lights</button>
+        <button @click="deactivateLights">Deactivate Lights</button>
+      </div>
+      <p>Status: {{ isActive ? 'Active' : 'Inactive' }}</p>
 
-    <div class="light-grid">
-      <div class="light-box" v-for="light in trafficLights" :key="light.id">
-        <h3>{{ light.road }} - {{ light.direction }}</h3>
-        <div class="bulb" :class="light.color.toLowerCase()"></div>
-        <p>Current: {{ light.color }}</p>
+      <div class="intersection-layout">
+        <div class="light north" v-if="getLight('North')">
+          <div class="light-box">
+            <h3>{{ getLight('North').road }} - {{ getLight('North').direction }}</h3>
+            <div class="light-stack">
+              <div class="bulb red" :class="{ on: getLight('North').color === 'RED' }"></div>
+              <div class="bulb yellow" :class="{ on: getLight('North').color === 'YELLOW' }"></div>
+              <div class="bulb green" :class="{ on: getLight('North').color === 'GREEN' }"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="light west" v-if="getLight('West')">
+          <div class="light-box">
+            <h3>{{ getLight('West').road }} - {{ getLight('West').direction }}</h3>
+            <div class="light-stack">
+              <div class="bulb red" :class="{ on: getLight('West').color === 'RED' }"></div>
+              <div class="bulb yellow" :class="{ on: getLight('West').color === 'YELLOW' }"></div>
+              <div class="bulb green" :class="{ on: getLight('West').color === 'GREEN' }"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="center-label">Intersection</div>
+
+        <div class="light east" v-if="getLight('East')">
+          <div class="light-box">
+            <h3>{{ getLight('East').road }} - {{ getLight('East').direction }}</h3>
+            <div class="light-stack">
+              <div class="bulb red" :class="{ on: getLight('East').color === 'RED' }"></div>
+              <div class="bulb yellow" :class="{ on: getLight('East').color === 'YELLOW' }"></div>
+              <div class="bulb green" :class="{ on: getLight('East').color === 'GREEN' }"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="light south" v-if="getLight('South')">
+          <div class="light-box">
+            <h3>{{ getLight('South').road }} - {{ getLight('South').direction }}</h3>
+            <div class="light-stack">
+              <div class="bulb red" :class="{ on: getLight('South').color === 'RED' }"></div>
+              <div class="bulb yellow" :class="{ on: getLight('South').color === 'YELLOW' }"></div>
+              <div class="bulb green" :class="{ on: getLight('South').color === 'GREEN' }"></div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
-
-    <p>Status: {{ isActive ? 'Active' : 'Inactive' }}</p>
-  </div>
-</main>
+  </main>
 </template>
 
 <style scoped>
@@ -120,40 +168,71 @@ header {
   justify-content: center;
 }
 
-.light-grid {
+.intersection-layout {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  grid-template-areas:
+    ".    north    ."
+    "west center  east"
+    ".    south    .";
+  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-rows: auto auto auto;
   gap: 1rem;
-  margin-top: 1rem;
+  justify-items: center;
+  align-items: center;
+  margin-top: 2rem;
+}
+
+.north {
+  grid-area: north;
+}
+
+.south {
+  grid-area: south;
+}
+
+.east {
+  grid-area: east;
+}
+
+.west {
+  grid-area: west;
+}
+
+.center-label {
+  grid-area: center;
+  font-weight: bold;
 }
 
 .light-box {
   text-align: center;
 }
 
+.light-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  align-items: center;
+  margin-top: 0.5rem;
+}
+
 .bulb {
-  width: 40px;
-  height: 40px;
+  width: 30px;
+  height: 30px;
   border-radius: 50%;
-  margin: 0.5rem auto;
   border: 2px solid #333;
   background-color: #ccc;
+  transition: background-color 0.3s;
 }
 
-.bulb.off {
-  background-color: #ccc;
-}
-
-.bulb.red {
+.bulb.on.red {
   background-color: #cc3232;
 }
 
-.bulb.yellow {
+.bulb.on.yellow {
   background-color: #e7b416;
 }
 
-.bulb.green {
+.bulb.on.green {
   background-color: #2dc937;
 }
-
 </style>

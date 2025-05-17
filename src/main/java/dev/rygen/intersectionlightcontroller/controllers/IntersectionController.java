@@ -49,6 +49,12 @@ public class IntersectionController {
         return ResponseEntity.ok().build();
     }
 
+    @PostMapping("/{id}/deactivate")
+    public ResponseEntity<?> deactivateIntersection(@PathVariable("id") int id) {
+        intersectionService.deactivateLights(id);
+        return ResponseEntity.ok().build();
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<IntersectionDTO> getIntersection(@PathVariable("id") int id) {
         Intersection intersection = intersectionRepository.findById(id)

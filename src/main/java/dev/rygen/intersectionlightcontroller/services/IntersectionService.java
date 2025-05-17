@@ -7,8 +7,11 @@ import dev.rygen.intersectionlightcontroller.repositories.IntersectionRepository
 import dev.rygen.intersectionlightcontroller.repositories.LightRepository;
 
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
 import org.springframework.stereotype.Service;
@@ -20,6 +23,7 @@ public class IntersectionService {
     private final IntersectionRepository intersectionRepository;
     private final LightRepository lightRepository;
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(4);
+    private final Map<Integer, ScheduledFuture<?>> scheduledTasks = new ConcurrentHashMap<>();
 
     public IntersectionService(IntersectionRepository intersectionRepository, LightRepository lightRepository) {
         this.intersectionRepository = intersectionRepository;
@@ -33,8 +37,8 @@ public class IntersectionService {
         TrafficLight.builder()
             .currColor(Colors.OFF)
             .gTime(4)
-            .yTime(3)
-            .rTime(4)
+            .yTime(2)
+            .rTime(6)
             .isActive(false)
             .road("N Main St")
             .direction("North")
@@ -43,8 +47,8 @@ public class IntersectionService {
         TrafficLight.builder()
             .currColor(Colors.OFF)
             .gTime(4)
-            .yTime(3)
-            .rTime(4)
+            .yTime(2)
+            .rTime(6)
             .isActive(false)
             .road("N Main St")
             .direction("South")
@@ -53,8 +57,8 @@ public class IntersectionService {
         TrafficLight.builder()
             .currColor(Colors.OFF)
             .gTime(4)
-            .yTime(3)
-            .rTime(4)
+            .yTime(2)
+            .rTime(6)
             .isActive(false)
             .road("College St")
             .direction("East")
@@ -63,8 +67,8 @@ public class IntersectionService {
         TrafficLight.builder()
             .currColor(Colors.OFF)
             .gTime(4)
-            .yTime(3)
-            .rTime(4)
+            .yTime(2)
+            .rTime(6)
             .isActive(false)
             .road("College St")
             .direction("West")
@@ -81,11 +85,28 @@ public class IntersectionService {
 
         for (TrafficLight light : lights) {
             if (!light.isActive()) {
+                light.setCurrColor(Colors.OFF);
                 light.setIsActive(true);
                 lightRepository.save(light);
                 startLightCycle(light);
             }
         }
+    }
+
+    public void deactivateLights(int intersectionId) {
+        List<TrafficLight> lights = lightRepository.findByIntersection_IntersectionId(intersectionId);
+
+        for (TrafficLight light : lights) {
+            // Cancel all scheduled tasks to reset colors and timers
+            ScheduledFuture<?> task = scheduledTasks.remove(light.getId());
+            if (task != null) {
+                task.cancel(true);
+            }
+
+            light.setCurrColor(Colors.OFF);
+            light.setIsActive(false);
+        }
+        lightRepository.saveAll(lights);
     }
 
     private void startLightCycle(TrafficLight light) {
@@ -107,11 +128,13 @@ public class IntersectionService {
                 delay = light.getRTime();
             }
 
-            scheduler.schedule(this, delay, TimeUnit.SECONDS);
+            ScheduledFuture<?> nextTask = scheduler.schedule(this, delay, TimeUnit.SECONDS);
+            scheduledTasks.put(light.getId(), nextTask);
             }
         };
 
-        scheduler.schedule(cycleTask, 0, TimeUnit.SECONDS); // Start immediately
+        ScheduledFuture<?> initialTask = scheduler.schedule(cycleTask, 0, TimeUnit.SECONDS);
+        scheduledTasks.put(light.getId(), initialTask);
     }
 
 }
