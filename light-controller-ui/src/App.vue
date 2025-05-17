@@ -1,13 +1,78 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import axios from 'axios'
-const activeLight = ref<string>('red')
 
-const handleActiveLightChange = () => {
-  axios.post('http://localhost:8080/intersections', { activeLight: activeLight.value })
-    .then(console.log)
-    .catch(console.error)
+const activeIntersection = ref<number | null>(null)
+const trafficLights = ref<any[]>([])
+const isActive = ref<boolean>(false)
+let pollInterval: number | undefined = undefined
+
+const createIntersection = async () => {
+  try {
+    const response = await axios.post('http://localhost:8080/intersections', {
+      activeLight: 0
+    })
+
+    activeIntersection.value = response.data.id
+    console.log('Created intersection with ID:', response.data.id)
+
+    fetchLights()
+  } catch (err) {
+    console.error('Failed to create intersection', err)
+  }
 }
+
+const activateLights = async () => {
+  if (activeIntersection.value === null) return
+
+  try {
+    await axios.post(`http://localhost:8080/intersections/${activeIntersection.value}/activate`)
+    isActive.value = true
+    startPolling()
+    console.log('Sending activation request...')
+  } catch (err) {
+    console.error(err)
+  }
+}
+
+const deactivateLights = () => {
+  isActive.value = false
+  clearInterval(pollInterval)
+  trafficLights.value = trafficLights.value.map(light => ({
+    ...light, color: 'OFF'
+  }))
+  console.log('Lights deactivated')
+}
+
+const fetchLights = async () => {
+  if (activeIntersection.value === null) return
+
+  try {
+    const res = await axios.get(`http://localhost:8080/intersections/${activeIntersection.value}`)
+    if (!res.data.trafficLights || res.data.trafficLights.length === 0) {
+      trafficLights.value = [
+        { id: 1, color: 'OFF', road: 'Default', direction: 'NORTH' },
+        { id: 2, color: 'OFF', road: 'Default', direction: 'SOUTH' },
+        { id: 3, color: 'OFF', road: 'Default', direction: 'EAST' },
+        { id: 4, color: 'OFF', road: 'Default', direction: 'WEST' }
+      ]
+    }
+    else {
+      trafficLights.value = res.data.trafficLights
+    }
+  } catch (err) {
+    console.error('Failed to fetch lights', err)
+  }
+}
+
+const startPolling = () => {
+  fetchLights()
+  pollInterval = setInterval(fetchLights, 1000)
+}
+
+onMounted(() => {
+  createIntersection()
+})
 </script>
 
 <template>
@@ -18,25 +83,23 @@ const handleActiveLightChange = () => {
   </header>
 
   <main>
-    <div class="light-controller">
-      <div class="light">
-        <label>
-          <input type="radio" value="red" class="red" v-model="activeLight" name="light"
-            @change="handleActiveLightChange" /> Red
-        </label>
-        <label>
-          <input type="radio" value="yellow" class="yellow" v-model="activeLight" name="light"
-            @change="handleActiveLightChange" /> Yellow
-        </label>
-        <label>
-          <input type="radio" value="green" class="green" v-model="activeLight" name="light"
-            @change="handleActiveLightChange" /> Green
-        </label>
-      </div>
-
-      <p>Active light: {{ activeLight }}</p>
+  <div class="light-controller">
+    <div class="controls">
+      <button @click="activateLights">Activate Lights</button>
+      <button @click="deactivateLights">Deactivate Lights</button>
     </div>
-  </main>
+
+    <div class="light-grid">
+      <div class="light-box" v-for="light in trafficLights" :key="light.id">
+        <h3>{{ light.road }} - {{ light.direction }}</h3>
+        <div class="bulb" :class="light.color.toLowerCase()"></div>
+        <p>Current: {{ light.color }}</p>
+      </div>
+    </div>
+
+    <p>Status: {{ isActive ? 'Active' : 'Inactive' }}</p>
+  </div>
+</main>
 </template>
 
 <style scoped>
@@ -44,46 +107,53 @@ header {
   line-height: 1.5;
 }
 
-.logo {
-  display: block;
-  margin: 0 auto 2rem;
-}
-
-@media (min-width: 1024px) {
-  header {
-    display: flex;
-    place-items: center;
-    margin: calc(var(--section-gap) / 4);
-  }
-
-  header .wrapper {
-    display: flex;
-    place-items: flex-start;
-    flex-wrap: wrap;
-  }
-}
-
 .light-controller {
   display: grid;
   place-items: center;
+  gap: 1.5rem;
+}
+
+.controls {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.light-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
   gap: 1rem;
-
-  .light {
-    display: grid;
-    gap: .5rem;
-  }
-
+  margin-top: 1rem;
 }
 
-input[type='radio'].red {
-  accent-color: #cc3232;
+.light-box {
+  text-align: center;
 }
 
-input[type='radio'].yellow {
-  accent-color: #e7b416;
+.bulb {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  margin: 0.5rem auto;
+  border: 2px solid #333;
+  background-color: #ccc;
 }
 
-input[type='radio'].green {
-  accent-color: #2dc937;
+.bulb.off {
+  background-color: #ccc;
 }
+
+.bulb.red {
+  background-color: #cc3232;
+}
+
+.bulb.yellow {
+  background-color: #e7b416;
+}
+
+.bulb.green {
+  background-color: #2dc937;
+}
+
 </style>
