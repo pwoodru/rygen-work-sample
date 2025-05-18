@@ -1,5 +1,7 @@
 # Traffic Light Controller - Patrick Woodrum
 
+![Intersection Preview](int_preview.png)
+
 This application will function as a traffic controller visual with minimal aesthetics. It will consist of an intersection, four traffic lights, and the logic to make them function as they should in the real world with added buttons for total control. 
 
 This project will be used to showcase my abilities with both backend and frontend coding, using Java and Vue respectively.
