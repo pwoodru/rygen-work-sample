@@ -34,6 +34,9 @@ public class IntersectionService {
     public Intersection createIntersection(Intersection intersection) {
         Intersection int1 = intersectionRepository.save(intersection);
 
+        // Traffic light initialization
+        // Each light has a default state of OFF (to allow an immediate cycle to green)
+        // and a default time of 4 seconds for green, 2 seconds for yellow, and 6 seconds for red (Green + Yellow = Red)
         List<TrafficLight> initLights = List.of(
         TrafficLight.builder()
             .currColor(Colors.OFF)
